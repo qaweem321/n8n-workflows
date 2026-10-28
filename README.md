@@ -46,9 +46,10 @@ Docker volume, so later starts are instant.
 
 Open http://localhost:5678. On first launch n8n asks you to create the owner account.
 
-| Email | Password | Role |
+| Login | Password | Role |
 | ----- | -------- | ---- |
 | The email you enter on first launch | The password you choose (8+ characters, 1 number, 1 capital) | Owner |
+| `info` (mailbox `info@acme.test`) | `demo` | Test mailbox (GreenMail IMAP/SMTP), already set in the imported credential |
 
 Then import the credentials and all workflows (needs Node.js):
 
