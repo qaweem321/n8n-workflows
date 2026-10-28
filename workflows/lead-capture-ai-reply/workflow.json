@@ -1,0 +1,445 @@
+{
+  "id": "leadCaptureAiRpl",
+  "name": "Lead capture with instant AI reply",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "nodes": [
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000001",
+      "name": "Contact form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "2b0c7a52-6f0e-4d8a-9b5e-6a1d3c2f4e10",
+      "parameters": {
+        "authentication": "none",
+        "formTitle": "Get in touch",
+        "formDescription": "Tell us what you need. You'll get a reply in your inbox within a minute.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "name",
+              "fieldLabel": "Your name",
+              "fieldType": "text",
+              "placeholder": "Sara Khan",
+              "requiredField": true
+            },
+            {
+              "fieldName": "email",
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "sara@company.com",
+              "requiredField": true
+            },
+            {
+              "fieldName": "company",
+              "fieldLabel": "Company",
+              "fieldType": "text",
+              "placeholder": "Optional"
+            },
+            {
+              "fieldName": "message",
+              "fieldLabel": "How can we help?",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "path": "contact",
+          "appendAttribution": false,
+          "buttonLabel": "Send",
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thanks! We've sent a reply to your inbox."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000002",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "companyName",
+              "value": "Acme Studio",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "services",
+              "value": "websites, online shops (Shopify and WooCommerce), booking systems and landing pages",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "fromEmail",
+              "value": "hello@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "salesEmail",
+              "value": "sales@acme.test",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000003",
+      "name": "Write reply with AI",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Name: {{ $json.name }}\nEmail: {{ $json.email }}\nCompany: {{ $json.company || 'not given' }}\nMessage: {{ $json.message }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "=You work at {{ $json.companyName }}, a small business. Our services: {{ $json.services }}. You read messages sent through our website's contact form and answer them on behalf of {{ $json.companyName }}.\n\nReturn ONLY a JSON object with these keys, in this order:\n- \"summary\": one short sentence for our sales team describing what the sender wants.\n- \"category\": exactly one of:\n  \"hot_lead\" = wants to hire or buy from us AND mentions a budget, a deadline or starting soon.\n  \"lead\" = wants to hire us or asks about our services, without budget or timing.\n  \"spam\" = is selling or offering something TO us (SEO, backlinks, marketing, leads, crypto), advertising, or nonsense.\n  \"job_application\" = is looking for a job or internship with us.\n- \"reply_subject\": a short email subject.\n- \"reply_body\": our reply TO the sender, 3 to 5 sentences. Greet them by first name, thank them, mention what they asked about and say a team member will contact them within one business day. Never promise prices, dates or a start time. Only mention services from our list. Sign it \"The {{ $json.companyName }} team\".\n\nExample message: \"Hello, I'm Tom from Peak Fitness. We need a new booking website before our gym opens in 3 weeks. Budget 5k.\"\nExample answer: {\"summary\":\"Peak Fitness needs a booking website within 3 weeks, budget about $5k.\",\"category\":\"hot_lead\",\"reply_subject\":\"Your new booking website\",\"reply_body\":\"Hi Tom,\\n\\nThanks for getting in touch about a booking website for Peak Fitness. A member of our team will contact you within one business day to talk through your plans and timeline.\\n\\nThe {{ $json.companyName }} team\"}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000004",
+      "name": "Local AI model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        520
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qwen2.5-3b-instruct"
+        },
+        "responsesApiEnabled": false,
+        "builtInTools": {},
+        "options": {
+          "responseFormat": "json_object",
+          "temperature": 0.3,
+          "maxTokens": 400
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "localAiLlamaCpp1",
+          "name": "Local AI (llama.cpp)"
+        }
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000005",
+      "name": "Read AI answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// The AI node returns the parsed JSON fields, or { text } if the model's answer was not valid JSON.\n// Small models make mistakes, so every field has a safe fallback.\nconst lead = $('Settings').first().json;\nlet ai = $json;\nif (typeof ai.reply_body !== 'string') {\n  try {\n    ai = JSON.parse(ai.text);\n  } catch {\n    ai = {};\n  }\n}\n\nconst firstName = String(lead.name || '').trim().split(/\\s+/)[0] || 'there';\n// The AI picks a category; the rest of the workflow works with a simple priority.\nconst priorities = { hot_lead: 'high', lead: 'medium', spam: 'low', job_application: 'low' };\nconst category = String(ai.category || '').toLowerCase();\nconst priority = priorities[category] || 'medium';\n\nreturn [{\n  json: {\n    name: lead.name,\n    email: lead.email,\n    company: lead.company || '',\n    message: lead.message,\n    companyName: lead.companyName,\n    fromEmail: lead.fromEmail,\n    salesEmail: lead.salesEmail,\n    aiUsed: typeof ai.reply_body === 'string' && ai.reply_body.trim() !== '',\n    category: priorities[category] ? category : 'lead',\n    priority,\n    summary: ai.summary || lead.message,\n    replySubject: ai.reply_subject || `Thanks for contacting ${lead.companyName}`,\n    replyBody: ai.reply_body ||\n      `Hi ${firstName},\\n\\nThanks for reaching out. A member of our team will contact you within one business day.\\n\\nThe ${lead.companyName} team`,\n  },\n}];"
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000006",
+      "name": "Email reply to lead",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1240,
+        100
+      ],
+      "webhookId": "9d4e1f3a-2c5b-4a7d-8e6f-1b2c3d4e5f60",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "={{ $json.companyName }} <{{ $json.fromEmail }}>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.replySubject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.replyBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000007",
+      "name": "Hot lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b7e0c1d2-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000008",
+      "name": "Alert sales: hot lead",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1240,
+        380
+      ],
+      "webhookId": "9d4e1f3a-2c5b-4a7d-8e6f-1b2c3d4e5f61",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "=Lead bot <{{ $json.fromEmail }}>",
+        "toEmail": "={{ $json.salesEmail }}",
+        "subject": "=HOT lead: {{ $json.name }}{{ $json.company ? ' (' + $json.company + ')' : '' }}",
+        "emailFormat": "text",
+        "text": "=Contact this lead today.\n\nSummary: {{ $json.summary }}\n\nName: {{ $json.name }}\nEmail: {{ $json.email }}\nCompany: {{ $json.company || '-' }}\n\nTheir message:\n{{ $json.message }}\n\n{{ $json.aiUsed ? 'The AI already sent them this reply' : 'The AI was unavailable, so they got the standard reply' }}:\n{{ $json.replyBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000009",
+      "name": "Notify sales: new lead",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1240,
+        560
+      ],
+      "webhookId": "9d4e1f3a-2c5b-4a7d-8e6f-1b2c3d4e5f62",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "=Lead bot <{{ $json.fromEmail }}>",
+        "toEmail": "={{ $json.salesEmail }}",
+        "subject": "={{ $json.priority === 'low' ? ($json.category === 'job_application' ? 'Job application' : 'Filtered as spam') + ' (no reply sent)' : 'New lead' }}: {{ $json.name }}",
+        "emailFormat": "text",
+        "text": "=Summary: {{ $json.summary }}\n\nName: {{ $json.name }}\nEmail: {{ $json.email }}\nCompany: {{ $json.company || '-' }}\n\nTheir message:\n{{ $json.message }}\n\n{{ $json.priority === 'low' ? 'No reply was sent.' : ($json.aiUsed ? 'The AI already sent them this reply' : 'The AI was unavailable, so they got the standard reply') + ':\\n' + $json.replyBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000010",
+      "name": "How it works",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -40
+      ],
+      "parameters": {
+        "width": 560,
+        "height": 280,
+        "content": "## Lead capture with instant AI reply\n1. A visitor fills in the **Contact form**.\n2. The **AI** sorts the message (hot lead, lead, spam, job application) and writes a personal reply.\n3. Real leads get the reply by email within a minute. Spam and job applications get no reply.\n4. Sales gets an alert; hot leads are flagged.\n\n**Customise:** edit company name and emails in **Settings**. To use Claude, OpenAI or Gemini instead of the free local model, replace the **Local AI model** node."
+      }
+    },
+    {
+      "id": "6f1c2a10-1a11-4c3e-9a01-000000000011",
+      "name": "Real lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b7e0c1d2-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "low",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Contact form": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Write reply with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local AI model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write reply with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write reply with AI": {
+      "main": [
+        [
+          {
+            "node": "Read AI answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read AI answer": {
+      "main": [
+        [
+          {
+            "node": "Real lead?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hot lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot lead?": {
+      "main": [
+        [
+          {
+            "node": "Alert sales: hot lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify sales: new lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Real lead?": {
+      "main": [
+        [
+          {
+            "node": "Email reply to lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {}
+}

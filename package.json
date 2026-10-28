@@ -4,11 +4,14 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-workflows.mjs",
+    "import": "sh scripts/import.sh",
+    "demo:lead-capture": "node scripts/demo/lead-capture-ai-reply.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
-    "husky": "9.1.7"
+    "husky": "9.1.7",
+    "playwright-core": "1.64.0"
   }
 }
