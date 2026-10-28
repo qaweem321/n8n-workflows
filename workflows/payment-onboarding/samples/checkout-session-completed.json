@@ -1,0 +1,35 @@
+{
+  "id": "evt_demo_1QbX7cAcmeStudio01",
+  "object": "event",
+  "api_version": "2025-09-30.clover",
+  "created": 1793145600,
+  "livemode": false,
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "id": "cs_test_a1B2c3D4e5F6g7H8",
+      "object": "checkout.session",
+      "mode": "subscription",
+      "status": "complete",
+      "payment_status": "paid",
+      "amount_subtotal": 9900,
+      "amount_total": 9900,
+      "currency": "usd",
+      "customer": "cus_demo_RhK29xL",
+      "customer_details": {
+        "name": "Maria Lopez",
+        "email": "maria@sunrisecafe.test",
+        "address": { "country": "US" }
+      },
+      "metadata": { "plan": "Website Care Pro" },
+      "custom_fields": [
+        {
+          "key": "goal",
+          "label": { "type": "custom", "custom": "What do you want to achieve first?" },
+          "type": "text",
+          "text": { "value": "Get more table bookings from Google for our cafe" }
+        }
+      ]
+    }
+  }
+}

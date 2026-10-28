@@ -9,6 +9,7 @@
     "demo:lead-capture": "node scripts/demo/lead-capture-ai-reply.mjs",
     "demo:inbox-triage": "node scripts/demo/inbox-triage.mjs",
     "demo:invoice-extraction": "node scripts/demo/invoice-extraction.mjs",
+    "demo:payment-onboarding": "node scripts/demo/payment-onboarding.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

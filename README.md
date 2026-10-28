@@ -1,7 +1,7 @@
 # n8n Workflows
 
 Ready-to-import [n8n](https://n8n.io) automations for small businesses: lead follow-up, inbox triage,
-document extraction and customer onboarding.
+invoice data extraction and customer onboarding after payment.
 
 Everything runs free on your own machine: n8n, a local AI model and a test inbox, with no API
 keys and no accounts. To go live, swap the AI node for Claude, OpenAI or Gemini and the email
@@ -14,6 +14,7 @@ credential for your real SMTP provider.
 | [Lead capture with instant AI reply](workflows/lead-capture-ai-reply) | Contact form → AI rates the lead and emails a personal reply → sales gets an alert, hot leads flagged | [Video](workflows/lead-capture-ai-reply/demo.mp4) |
 | [Inbox triage with AI](workflows/inbox-triage) | New email in info@ → AI sorts it (support, sales, billing, spam) → forwarded to the right team with a summary and a safe reply; urgent ones alert the manager | [Video](workflows/inbox-triage/demo.mp4) |
 | [Invoice data extraction with AI](workflows/invoice-extraction) | Upload a PDF invoice → AI copies supplier, dates and amounts → code checks the math → accounts gets the details and a CSV row; wrong totals flagged | [Video](workflows/invoice-extraction/demo.mp4) |
+| [Customer onboarding after payment](workflows/payment-onboarding) | Stripe payment → AI suggests first steps from the customer's goal → welcome email with kickoff link; team gets a dated checklist; Stripe retries ignored | [Video](workflows/payment-onboarding/demo.mp4) |
 
 ![Lead capture demo](workflows/lead-capture-ai-reply/demo.gif)
 
@@ -104,6 +105,10 @@ npm run demo:inbox-triage
 npm run demo:invoice-extraction
 ```
 
+```bash
+npm run demo:payment-onboarding
+```
+
 The sample invoice PDFs are rebuilt with `node scripts/demo/make-sample-invoices.mjs`.
 
 ## Project structure
@@ -113,7 +118,7 @@ compose.yaml                 n8n + local AI (llama.cpp) + Mailpit + GreenMail te
 credentials/local.json       local credentials (no secrets: local AI and test mailboxes only)
 workflows/<name>/
   workflow.json              n8n export, imported by npm run import
-  samples/                   sample files to try it with (invoice workflow)
+  samples/                   sample files to try it with (invoice PDFs, a Stripe event)
   README.md                  what it does, credentials, how to try it
   demo.mp4, demo.gif         recorded demo
 scripts/

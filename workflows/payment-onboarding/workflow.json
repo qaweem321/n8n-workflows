@@ -1,0 +1,358 @@
+{
+  "id": "paymentOnboardAi",
+  "name": "Customer onboarding after payment",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "nodes": [
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000001",
+      "name": "Payment received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "5e2f9c74-8b2a-4fac-9d70-8c3f5e4b6a32",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "paymentHookLocal",
+          "name": "Payment webhook secret (local)"
+        }
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000002",
+      "name": "Read payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// Reads a Stripe \"checkout.session.completed\" event. Anything else is skipped (Stripe already got its 200 reply).\n// Stripe re-sends an event when it doesn't get a quick reply, so event ids are remembered to avoid double welcomes.\nconst event = $json.body ?? {};\nconst session = event.data?.object ?? {};\nconst skip = (reason) => ({ json: { skip: true, reason, eventId: event.id ?? null } });\n\nif (event.type !== 'checkout.session.completed') return skip(`Ignored event type: ${event.type ?? 'unknown'}`);\nif (session.payment_status !== 'paid') return skip(`Payment not completed (${session.payment_status ?? 'unknown'})`);\nconst email = String(session.customer_details?.email ?? '').trim().toLowerCase();\nif (!email) return skip('No customer email in the event');\n\nconst memory = $getWorkflowStaticData('global');\nmemory.eventIds = memory.eventIds ?? [];\nif (memory.eventIds.includes(event.id)) return skip(`Duplicate event ${event.id}`);\nmemory.eventIds = [...memory.eventIds, event.id].slice(-500);\n\n// Stripe amounts are in the smallest unit (cents), except for zero-decimal currencies like JPY.\nconst zeroDecimal = ['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'];\nconst currency = String(session.currency ?? '').toLowerCase();\nconst decimals = zeroDecimal.includes(currency) ? 0 : 2;\nconst amount = Number(session.amount_total ?? 0) / 10 ** decimals;\nconst name = String(session.customer_details?.name ?? '').trim();\nconst goal = String((session.custom_fields ?? []).find((f) => f.key === 'goal')?.text?.value ?? '').trim();\n\nreturn {\n  json: {\n    skip: false,\n    eventId: event.id,\n    customerName: name || email,\n    firstName: name.split(/\\s+/)[0] || 'there',\n    customerEmail: email,\n    plan: String(session.metadata?.plan ?? '').trim() || 'your plan',\n    goal,\n    amountText: `${currency.toUpperCase()} ${amount.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`,\n    paidAt: new Date((event.created ?? Date.now() / 1000) * 1000).toISOString(),\n  },\n};"
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000003",
+      "name": "New paid order?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d9a1e2f3-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000004",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        280
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "companyName",
+              "value": "Acme Studio",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "fromEmail",
+              "value": "hello@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "teamEmail",
+              "value": "team@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "kickoffLink",
+              "value": "https://acme.test/book-kickoff",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000005",
+      "name": "Suggest first steps with AI",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        880,
+        280
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "promptType": "define",
+        "text": "=Plan: {{ $json.plan }}\nGoal: {{ $json.goal || 'not given' }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "=You help {{ $json.companyName }}, a small web design business, welcome a new customer who just bought a website care plan.\n\nReturn ONLY a JSON object: {\"tips\": [three strings]}.\nEach tip is one thing the customer can prepare before our kickoff call that helps with their goal.\nEach tip starts with a verb, is under 15 words, and asks them to gather, list, share or decide something.\nWe set up website access with them securely on the call, so tips are about their business, customers, content and photos.\nDo not promise results, prices or dates.\n\nExample goal: \"More online orders for our flower shop\"\nExample answer: {\"tips\":[\"List your five best-selling bouquets and their prices.\",\"Share photos of your shop and arrangements you're proud of.\",\"Decide which delivery areas and times you offer.\"]}"
+            }
+          ]
+        },
+        "batching": {}
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000006",
+      "name": "Local AI model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        500
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qwen2.5-3b-instruct"
+        },
+        "responsesApiEnabled": false,
+        "builtInTools": {},
+        "options": {
+          "responseFormat": "json_object",
+          "temperature": 0.3,
+          "maxTokens": 200
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "localAiLlamaCpp1",
+          "name": "Local AI (llama.cpp)"
+        }
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000007",
+      "name": "Build welcome emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// The AI only suggests what the customer can prepare. Everything else is a fixed template,\n// and tips are filtered so a customer is never asked for passwords or logins.\nconst p = $('Settings').item.json;\nlet ai = $json;\nif (!Array.isArray(ai.tips)) {\n  try {\n    ai = JSON.parse(ai.text);\n  } catch {\n    ai = {};\n  }\n}\n\nconst fallbackTips = [\n  'List the pages or features you want us to look at first.',\n  'Gather any photos, logos or texts you want on your site.',\n  'Note two websites you like and what you like about them.',\n];\nconst tips = (Array.isArray(ai.tips) ? ai.tips : [])\n  .map((t) => String(t).trim())\n  .filter((t) => t && t.length <= 140 && !/password|login|log in|credential|access|\\bpin\\b/i.test(t))\n  .slice(0, 3);\nfor (const tip of fallbackTips) if (tips.length < 3 && !tips.includes(tip)) tips.push(tip);\n\n// \"Oct 30, 2026\": never ambiguous, always UTC.\nconst day = 24 * 60 * 60 * 1000;\nconst pretty = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });\nconst paidAt = new Date(p.paidAt);\nconst kickoffBy = pretty(new Date(paidAt.getTime() + 2 * day));\nconst checkInOn = pretty(new Date(paidAt.getTime() + 7 * day));\n\nconst welcomeBody = [\n  `Hi ${p.firstName},`,\n  '',\n  `Thanks for joining ${p.companyName}! Your ${p.plan} plan is active and your payment of ${p.amountText} is confirmed.`,\n  '',\n  `Next step: book your 30-minute kickoff call here: ${p.kickoffLink}`,\n  ...(p.goal ? ['', `You told us your first goal is: \"${p.goal}\"`] : []),\n  '',\n  'To get the most out of the call, it helps if you:',\n  ...tips.map((t, i) => `${i + 1}. ${t}`),\n  '',\n  'Questions? Just reply to this email.',\n  '',\n  `The ${p.companyName} team`,\n].join('\\n');\n\nconst teamBody = [\n  `${p.customerName} just paid for ${p.plan}.`,\n  '',\n  `Email:  ${p.customerEmail}`,\n  `Paid:   ${p.amountText} on ${pretty(paidAt)}`,\n  `Goal:   ${p.goal || '-'}`,\n  '',\n  'Onboarding checklist:',\n  '[x] Welcome email sent (automatic)',\n  `[ ] Kickoff call booked by ${kickoffBy}`,\n  '[ ] Website access set up with the customer on the call',\n  `[ ] First check-in on ${checkInOn}`,\n].join('\\n');\n\nreturn {\n  json: {\n    customerEmail: p.customerEmail,\n    fromEmail: p.fromEmail,\n    teamEmail: p.teamEmail,\n    companyName: p.companyName,\n    tips,\n    aiUsed: Array.isArray(ai.tips),\n    welcomeSubject: `Welcome to ${p.plan}, ${p.firstName}!`,\n    welcomeBody,\n    teamSubject: `New customer: ${p.customerName} (${p.plan}, ${p.amountText})`,\n    teamBody,\n  },\n};"
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000008",
+      "name": "Welcome customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        180
+      ],
+      "webhookId": "c3d4e5f6-3333-4c4d-9e5f-000000000001",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "={{ $json.companyName }} <{{ $json.fromEmail }}>",
+        "toEmail": "={{ $json.customerEmail }}",
+        "subject": "={{ $json.welcomeSubject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.welcomeBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000009",
+      "name": "Tell the team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        400
+      ],
+      "webhookId": "c3d4e5f6-3333-4c4d-9e5f-000000000002",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "=Onboarding bot <{{ $json.fromEmail }}>",
+        "toEmail": "={{ $json.teamEmail }}",
+        "subject": "={{ $json.teamSubject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.teamBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "9c4f5d40-4d44-4f6b-ad04-000000000010",
+      "name": "How it works",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -80
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 300,
+        "content": "## Customer onboarding after payment\n1. Stripe tells n8n a checkout was paid (`checkout.session.completed`).\n2. **Read payment** skips other events, unpaid sessions and Stripe retries of the same event.\n3. The **AI** suggests three things the customer can prepare, based on the goal they typed at checkout.\n4. The customer gets a welcome email with the kickoff-call link. The team gets an onboarding checklist with dates.\n\n**Go live:** replace **Payment received** with the **Stripe Trigger** node (or keep it and point a Stripe webhook here). Edit **Settings**. Replace **Local AI model** to use Claude, OpenAI or Gemini."
+      }
+    }
+  ],
+  "connections": {
+    "Payment received": {
+      "main": [
+        [
+          {
+            "node": "Read payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read payment": {
+      "main": [
+        [
+          {
+            "node": "New paid order?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New paid order?": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Suggest first steps with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local AI model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Suggest first steps with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest first steps with AI": {
+      "main": [
+        [
+          {
+            "node": "Build welcome emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build welcome emails": {
+      "main": [
+        [
+          {
+            "node": "Welcome customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tell the team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
