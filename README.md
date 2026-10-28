@@ -13,6 +13,7 @@ credential for your real SMTP provider.
 | -------- | ------------ | ---- |
 | [Lead capture with instant AI reply](workflows/lead-capture-ai-reply) | Contact form → AI rates the lead and emails a personal reply → sales gets an alert, hot leads flagged | [Video](workflows/lead-capture-ai-reply/demo.mp4) |
 | [Inbox triage with AI](workflows/inbox-triage) | New email in info@ → AI sorts it (support, sales, billing, spam) → forwarded to the right team with a summary and a safe reply; urgent ones alert the manager | [Video](workflows/inbox-triage/demo.mp4) |
+| [Invoice data extraction with AI](workflows/invoice-extraction) | Upload a PDF invoice → AI copies supplier, dates and amounts → code checks the math → accounts gets the details and a CSV row; wrong totals flagged | [Video](workflows/invoice-extraction/demo.mp4) |
 
 ![Lead capture demo](workflows/lead-capture-ai-reply/demo.gif)
 
@@ -99,6 +100,12 @@ npm run demo:lead-capture
 npm run demo:inbox-triage
 ```
 
+```bash
+npm run demo:invoice-extraction
+```
+
+The sample invoice PDFs are rebuilt with `node scripts/demo/make-sample-invoices.mjs`.
+
 ## Project structure
 
 ```text
@@ -106,18 +113,20 @@ compose.yaml                 n8n + local AI (llama.cpp) + Mailpit + GreenMail te
 credentials/local.json       local credentials (no secrets: local AI and test mailboxes only)
 workflows/<name>/
   workflow.json              n8n export, imported by npm run import
+  samples/                   sample files to try it with (invoice workflow)
   README.md                  what it does, credentials, how to try it
   demo.mp4, demo.gif         recorded demo
 scripts/
   import.sh                  imports credentials + all workflows into n8n
   check-workflows.mjs        CI check: valid exports, README present, no pasted API keys
+tests/                       unit tests for the workflows' Code nodes (npm test)
   demo/                      Playwright scripts that record the demo videos, plus a tiny SMTP sender for test emails
 ```
 
 ## Contributing
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (checked by a git hook).
-Run `npm ci` once after cloning to install the hook, and `npm run check` before pushing.
+Run `npm ci` once after cloning to install the hook, and `npm run check` and `npm test` before pushing.
 
 ## License
 
