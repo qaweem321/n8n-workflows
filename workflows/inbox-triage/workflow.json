@@ -1,0 +1,388 @@
+{
+  "id": "inboxTriageAiRte",
+  "name": "Inbox triage with AI",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "nodes": [
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000001",
+      "name": "New email in shared inbox",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "format": "simple",
+        "options": {}
+      },
+      "credentials": {
+        "imap": {
+          "id": "greenmailImapLoc",
+          "name": "Shared inbox info@ (local GreenMail)"
+        }
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000002",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1",
+              "name": "companyName",
+              "value": "Acme Studio",
+              "type": "string"
+            },
+            {
+              "id": "d2",
+              "name": "supportEmail",
+              "value": "support@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "d3",
+              "name": "salesEmail",
+              "value": "sales@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "d4",
+              "name": "billingEmail",
+              "value": "billing@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "d5",
+              "name": "managerEmail",
+              "value": "manager@acme.test",
+              "type": "string"
+            },
+            {
+              "id": "d6",
+              "name": "botEmail",
+              "value": "inbox-bot@acme.test",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000003",
+      "name": "Sort email with AI",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        440,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "promptType": "define",
+        "text": "=From: {{ $json.from }}\nSubject: {{ $json.subject }}\n\n{{ ($json.textPlain || $json.textHtml || '').slice(0, 3000) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "=You sort the emails that arrive in the shared inbox of {{ $json.companyName }}, a small web design business. Our clients are businesses whose websites and online shops we built and run.\n\nReturn ONLY a JSON object with these keys, in this order:\n- \"summary\": one short sentence saying what the sender wants.\n- \"topic\": a few words for \"Thanks for your email about ...\", written to the sender, e.g. \"the checkout error on your shop\".\n- \"category\": exactly one of:\n  \"support\" = a client needs help with their existing website or shop: errors, things not working, complaints about our work or deadlines, or \"how do I...\" questions (even about adding products or menu items).\n  \"sales\" = someone wants NEW work from us: a new website or project, a quote, or prices.\n  \"billing\" = questions about money only: invoices, payments, refunds, receipts or subscription charges.\n  \"spam\" = newsletters, advertising, or someone selling something TO us.\n- \"urgency\": \"urgent\" if something is broken or down right now, the sender is losing money, is very angry, threatens to cancel or mentions a lawyer, or has a deadline today or tomorrow; otherwise \"normal\".\n\nExample email: \"Hi, since this morning our online shop shows a blank page and we can't take orders. Please help ASAP! - Lena\"\nExample answer: {\"summary\":\"Lena's online shop shows a blank page and cannot take orders since this morning.\",\"topic\":\"the blank page on your online shop\",\"category\":\"support\",\"urgency\":\"urgent\"}\n\nExample email: \"Hello, how can I change the opening hours on our website? Thanks, Raj\"\nExample answer: {\"summary\":\"Raj wants to know how to change the opening hours on his website.\",\"topic\":\"changing the opening hours on your website\",\"category\":\"support\",\"urgency\":\"normal\"}"
+            }
+          ]
+        },
+        "batching": {}
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000004",
+      "name": "Local AI model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        520
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qwen2.5-3b-instruct"
+        },
+        "responsesApiEnabled": false,
+        "builtInTools": {},
+        "options": {
+          "responseFormat": "json_object",
+          "temperature": 0.2,
+          "maxTokens": 400
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "localAiLlamaCpp1",
+          "name": "Local AI (llama.cpp)"
+        }
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000005",
+      "name": "Read AI answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// The AI node returns the parsed JSON fields, or { text } if the model's answer was not valid JSON.\n// If the AI fails, the email still goes to support so a person sees it.\n// The holding reply is a fixed template (not AI text), so it can never promise refunds, dates or fixes.\nconst email = $('Settings').item.json;\nlet ai = $json;\nif (typeof ai.category !== 'string') {\n  try {\n    ai = JSON.parse(ai.text);\n  } catch {\n    ai = {};\n  }\n}\n\nconst teams = {\n  support: { label: 'Support', to: email.supportEmail },\n  sales: { label: 'Sales', to: email.salesEmail },\n  billing: { label: 'Billing', to: email.billingEmail },\n  spam: { label: 'Spam', to: null },\n};\nconst category = teams[String(ai.category).toLowerCase()] ? String(ai.category).toLowerCase() : 'support';\n\n// \"Lena Fischer <lena@shop.test>\" -> name + address\nconst from = String(email.from || '');\nconst address = (from.match(/<([^>]+)>/) || [, from])[1].trim();\nconst name = from.replace(/<[^>]*>/, '').replace(/\"/g, '').trim() || address;\n\nconst firstName = name.split(/\\s+/)[0];\nconst topic = String(ai.topic || '').trim();\nconst replyDraft = topic && category !== 'spam'\n  ? `Hi ${firstName},\\n\\nThanks for your email about ${topic}. Our ${teams[category].label.toLowerCase()} team will get back to you shortly.\\n\\nThe ${email.companyName} team`\n  : '';\n\nreturn {\n  json: {\n    fromName: name,\n    fromEmail: address,\n    subject: email.subject || '(no subject)',\n    body: email.textPlain || email.textHtml || '',\n    category,\n    team: teams[category].label,\n    routeTo: teams[category].to,\n    urgent: String(ai.urgency).toLowerCase() === 'urgent',\n    aiUsed: typeof ai.summary === 'string' && ai.summary.trim() !== '',\n    summary: ai.summary || 'The AI could not read this email. Please check it yourself.',\n    replyDraft,\n    managerEmail: email.managerEmail,\n    botEmail: email.botEmail,\n    companyName: email.companyName,\n  },\n};"
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000006",
+      "name": "Needs a person?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c8f1d2e3-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "spam",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000007",
+      "name": "Forward to team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1260,
+        180
+      ],
+      "webhookId": "a1b2c3d4-1111-4a2b-9c3d-000000000001",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "=Inbox bot <{{ $json.botEmail }}>",
+        "toEmail": "={{ $json.routeTo }}",
+        "subject": "={{ $json.urgent ? '[URGENT] ' : '' }}[{{ $json.team }}] {{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "=From: {{ $json.fromName }} <{{ $json.fromEmail }}>\nSummary: {{ $json.summary }}\n{{ $json.replyDraft ? '\\nSuggested reply (check it, then reply to this email to send it to the customer):\\n' + $json.replyDraft + '\\n' : '' }}\n----- Original message -----\nSubject: {{ $json.subject }}\n\n{{ $json.body }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.fromEmail }}"
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000008",
+      "name": "Urgent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1260,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c8f1d2e3-0000-4000-8000-000000000002",
+              "leftValue": "={{ $json.urgent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000009",
+      "name": "Alert manager",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1500,
+        400
+      ],
+      "webhookId": "a1b2c3d4-1111-4a2b-9c3d-000000000002",
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "=Inbox bot <{{ $json.botEmail }}>",
+        "toEmail": "={{ $json.managerEmail }}",
+        "subject": "=URGENT email for {{ $json.team }}: {{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "=An urgent email just arrived and was sent to the {{ $json.team }} team.\n\nFrom: {{ $json.fromName }} <{{ $json.fromEmail }}>\nSummary: {{ $json.summary }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "smtp": {
+          "id": "mailpitSmtpLocal",
+          "name": "Mailpit (local test inbox)"
+        }
+      }
+    },
+    {
+      "id": "7a2d3b20-2b22-4d4f-8b02-000000000010",
+      "name": "How it works",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -60
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 280,
+        "content": "## Inbox triage with AI\n1. A new email arrives in your shared inbox (info@).\n2. The **AI** sorts it (support, sales, billing or spam), spots urgent ones and writes a one-line summary.\n3. The email goes to the right team with the summary and a safe holding reply. Hitting Reply answers the customer directly.\n4. Urgent emails also alert the manager. Spam is dropped.\n\n**Customise:** team addresses in **Settings**. Connect Gmail or Outlook by changing the IMAP credential. Replace **Local AI model** to use Claude, OpenAI or Gemini."
+      }
+    }
+  ],
+  "connections": {
+    "New email in shared inbox": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Sort email with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local AI model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sort email with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort email with AI": {
+      "main": [
+        [
+          {
+            "node": "Read AI answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read AI answer": {
+      "main": [
+        [
+          {
+            "node": "Needs a person?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs a person?": {
+      "main": [
+        [
+          {
+            "node": "Forward to team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Alert manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {}
+}

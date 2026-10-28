@@ -18,6 +18,7 @@ services:
     depends_on:
       - llm
       - mailpit
+      - greenmail
 
   # Free local AI with an OpenAI-compatible API (http://llm:8080/v1). No API key, no account.
   # Downloads the model (about 2.1 GB) on first start and keeps it in the llm_models volume.
@@ -41,6 +42,18 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8025:8025"
+
+  # A real IMAP/SMTP mailbox for testing: info@acme.test (login "info", password "demo").
+  # Workflows read it like they would read Gmail or Outlook. SMTP 3025 lets you send it test emails.
+  greenmail:
+    image: greenmail/standalone:2.1.14
+    restart: unless-stopped
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=info:demo@acme.test -Dgreenmail.users.login=local_part
+    ports:
+      - "127.0.0.1:3025:3025"
 
 volumes:
   n8n_data:

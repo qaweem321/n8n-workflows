@@ -12,6 +12,7 @@ credential for your real SMTP provider.
 | Workflow | What it does | Demo |
 | -------- | ------------ | ---- |
 | [Lead capture with instant AI reply](workflows/lead-capture-ai-reply) | Contact form → AI rates the lead and emails a personal reply → sales gets an alert, hot leads flagged | [Video](workflows/lead-capture-ai-reply/demo.mp4) |
+| [Inbox triage with AI](workflows/inbox-triage) | New email in info@ → AI sorts it (support, sales, billing, spam) → forwarded to the right team with a summary and a safe reply; urgent ones alert the manager | [Video](workflows/inbox-triage/demo.mp4) |
 
 ![Lead capture demo](workflows/lead-capture-ai-reply/demo.gif)
 
@@ -40,6 +41,7 @@ Docker volume, so later starts are instant.
 | ------- | --- | ---------- |
 | n8n | http://localhost:5678 | The automation editor |
 | Mailpit | http://localhost:8025 | Test inbox that catches every email the workflows send |
+| GreenMail | SMTP `localhost:3025`, IMAP `greenmail:3143` (inside Docker) | A real test mailbox, `info@acme.test` (login `info`, password `demo`), read by the inbox workflow |
 | Local AI | `http://llm:8080/v1` (inside Docker) | [llama.cpp](https://github.com/ggml-org/llama.cpp) server running Qwen2.5 3B, OpenAI-compatible |
 
 Open http://localhost:5678. On first launch n8n asks you to create the owner account.
@@ -92,11 +94,15 @@ Then record:
 npm run demo:lead-capture
 ```
 
+```bash
+npm run demo:inbox-triage
+```
+
 ## Project structure
 
 ```text
-compose.yaml                 n8n + local AI (llama.cpp) + Mailpit test inbox
-credentials/local.json       local credentials (no secrets: local AI and Mailpit only)
+compose.yaml                 n8n + local AI (llama.cpp) + Mailpit + GreenMail test mailboxes
+credentials/local.json       local credentials (no secrets: local AI and test mailboxes only)
 workflows/<name>/
   workflow.json              n8n export, imported by npm run import
   README.md                  what it does, credentials, how to try it
@@ -104,7 +110,7 @@ workflows/<name>/
 scripts/
   import.sh                  imports credentials + all workflows into n8n
   check-workflows.mjs        CI check: valid exports, README present, no pasted API keys
-  demo/                      Playwright scripts that record the demo videos
+  demo/                      Playwright scripts that record the demo videos, plus a tiny SMTP sender for test emails
 ```
 
 ## Contributing

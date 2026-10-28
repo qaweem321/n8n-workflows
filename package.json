@@ -6,6 +6,7 @@
     "check": "node scripts/check-workflows.mjs",
     "import": "sh scripts/import.sh",
     "demo:lead-capture": "node scripts/demo/lead-capture-ai-reply.mjs",
+    "demo:inbox-triage": "node scripts/demo/inbox-triage.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
