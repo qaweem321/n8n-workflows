@@ -21,9 +21,12 @@ Contact form → Settings → Write reply with AI → Read AI answer ─┬→ R
 2. **Settings**: your company name, your services, the "from" address and the sales inbox.
    Edit these first. The AI only mentions services from your list.
 3. **Write reply with AI**: sorts the message (hot lead, lead, spam or job application), writes
-   a one-line summary for sales and a 3 to 5 sentence reply. It never promises prices or dates.
+   a one-line summary for sales and a 3 to 5 sentence reply. It is told never to promise prices or dates.
 4. **Read AI answer**: checks the AI's answer and falls back to a polite standard reply if the
-   AI is down or returns something unusable, so real customers always hear back.
+   AI is down or returns something unusable, so real customers always hear back. The reply goes to
+   whatever address the visitor typed, and a message can try to steer the AI, so any reply with a
+   link, email address, phone number or amount is replaced by the standard reply too. Unit tests:
+   `tests/lead-capture-ai-reply.test.mjs`.
 5. **Emails**: real leads get the reply. Spam and job applications get no reply, because
    answering spam only confirms your address. Sales gets an email for every message, with
    `HOT lead` in the subject when there is a budget or deadline.
@@ -40,6 +43,12 @@ Contact form → Settings → Write reply with AI → Read AI answer ─┬→ R
 1. Turn the workflow on in n8n.
 2. Open http://localhost:5678/form/contact and send a message.
 3. Open http://localhost:8025 to see both emails (the local AI takes 10 to 60 seconds on a laptop).
+
+## Limits
+
+Like every contact form with an auto-reply, anyone can type someone else's address and send them
+one reply from you. Before going live, add a CAPTCHA (n8n's form has none; embed your own form with
+Cloudflare Turnstile or hCaptcha and post it to a Webhook node) or limit replies per address.
 
 ## Ideas to extend
 

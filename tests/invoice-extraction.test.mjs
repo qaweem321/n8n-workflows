@@ -46,7 +46,8 @@ test("a past due date is marked overdue", () => {
 });
 
 test("invalid dates are treated as missing", () => {
-  const r = check({ ...good, invoice_date: "31/10/2026" });
+  const r = check({ ...good, invoice_date: "31/10/2026", due_date: "2026-02-30" });
   assert.equal(r.invoiceDate, null);
+  assert.equal(r.dueDate, null);
   assert.deepEqual(r.issues, ["Invoice date is missing."]);
 });

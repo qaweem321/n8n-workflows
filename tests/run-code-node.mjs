@@ -1,4 +1,5 @@
-// Runs a "Run Once for Each Item" Code node from a workflow file outside n8n, for unit tests.
+// Runs a Code node from a workflow file outside n8n, for unit tests ("Run Once for All Items" nodes
+// return their first item).
 // `nodes` fakes what $('Node name').item returns inside n8n.
 // `staticData` fakes $getWorkflowStaticData('global'); pass the same object to share it between runs.
 import { readFileSync } from "node:fs";
@@ -12,5 +13,6 @@ export function runCodeNode(workflow, nodeName, json, nodes = {}, { staticData =
     return { item: nodes[name], first: () => nodes[name] };
   };
   const $getWorkflowStaticData = () => staticData;
-  return new Function("$json", "$", "$getWorkflowStaticData", node.parameters.jsCode)(json, $, $getWorkflowStaticData).json;
+  const result = new Function("$json", "$", "$getWorkflowStaticData", node.parameters.jsCode)(json, $, $getWorkflowStaticData);
+  return Array.isArray(result) ? result[0].json : result.json;
 }
